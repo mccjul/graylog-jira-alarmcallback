@@ -1,0 +1,70 @@
+version: '2'
+
+networks:
+  graylog.net:
+
+volumes:
+  graylog.data.elastic:
+    driver: "local"
+  graylog.data.mongo:
+    driver: "local"
+
+services:
+  mongo:
+    image: mongo:3
+    container_name: mongo
+    hostname: mongo
+    environment:
+      - TZ=America/Montreal
+    volumes:
+      - graylog.data.mongo:/data/db
+    networks:
+      - graylog.net
+
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:5.6.16
+    container_name: elasticsearch
+    hostname: graylog.elastic
+    environment:
+      - http.host=0.0.0.0
+      - transport.host=elasticsearch
+      - network.host=0.0.0.0
+      - TZ=America/Montreal
+      - cluster.name=graylog
+      - bootstrap.memory_lock=true
+      - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
+      - xpack.security.enabled=false
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+    mem_limit: 1g
+    volumes:
+      - graylog.data.elastic:/usr/share/elasticsearch/data
+    networks:
+      - graylog.net
+    ports:
+      - "9200:9200"
+
+  graylog:
+    image: graylog/graylog:2.4.6
+    hostname: graylog
+    environment:
+      - TZ=Europe/Berlin
+      - GRAYLOG_PASSWORD_SECRET=somepasswordpepper
+      - GRAYLOG_ROOT_PASSWORD_SHA2=8c6976e5b5410415bde908bd4dee15dfb167a9c873fc4bb8a81f6f2ab448a918
+      - GRAYLOG_WEB_ENDPOINT_URI=http://membersdevjulian.dev.123loadboard.com:9000/api
+      - GRAYLOG_ELASTICSEARCH_HOSTS=http://elasticsearch:9200
+      - ELASTICSEARCH_HOSTS=elasticsearch
+    ports:
+      - 9000:9000
+      - 12201:12201/udp
+      - 514:514/udp
+    volumes:
+      # Mount local plugin file into Docker container
+      - ./target/graylog-plugin-jira-1.0.8.jar:/usr/share/graylog/plugin/graylog-plugin-jira-1.0.8.jar
+    links:
+      - mongo
+      - elasticsearch
+    networks:
+      - graylog.net
